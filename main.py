@@ -284,3 +284,55 @@ def get_order(order_id: int, request: Request):
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/orders/user/{user_id}")
+def get_my_orders(user_id: int) -> List[Dict]:
+    try:
+        with engine.connect() as conn:
+            # Get orders for the user
+            orders_query = text("""
+                SELECT id, status, created_at, total
+                FROM orders
+                WHERE user_id = :uid
+                ORDER BY created_at DESC
+            """)
+            orders = conn.execute(
+                orders_query, {"uid": user_id}).mappings().all()
+
+            results = []
+            for order in orders:
+                # Get items for each order
+                items_query = text("""
+                    SELECT oi.product_id, oi.quantity, p.name, p.image
+                    FROM order_items oi
+                    LEFT JOIN products p ON oi.product_id = p.id
+                    WHERE oi.order_id = :oid
+                """)
+                items = conn.execute(
+                    items_query, {"oid": order["id"]}).mappings().all()
+
+                # Format products array
+                products = [
+                    {
+                        "name": item["name"] or "Product",
+                        "image": item["image"],
+                        "qty": item["quantity"]
+                    }
+                    for item in items
+                ]
+
+                results.append({
+                    "id": order["id"],
+                    "status": order["status"],
+                    "created_at": datetime.strftime(order["created_at"], "%b %d, %Y"),
+                    "total": order["total"],
+                    "item_count": sum(i["quantity"] for i in items),
+                    "products": products
+                })
+
+        return results
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
