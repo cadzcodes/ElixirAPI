@@ -48,7 +48,7 @@ def get_products():
         query = text("""
             SELECT id, name, slug, image, tags
             FROM products
-            WHERE availability = 'in-stock'
+            WHERE stocks > 0
         """)
         result = [dict(row) for row in conn.execute(query).mappings().all()]
     return result
@@ -335,4 +335,3 @@ def get_my_orders(user_id: int) -> List[Dict]:
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
-
